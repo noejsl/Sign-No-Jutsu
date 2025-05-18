@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="sign_no_jutsu"
         android:name="${applicationName}"
@@ -32,6 +35,16 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+         <provider
+             android:name="androidx.core.content.FileProvider"
+             android:authorities="${applicationId}.fileprovider"
+             android:exported="false"
+            android:grantUriPermissions="true">
+        <meta-data
+          android:name="android.support.FILE_PROVIDER_PATHS"
+          android:resource="@xml/provider_paths"/>
+</provider>
+
     </application>
     <uses-feature android:name="android.hardware.camera" android:required="true" />
     <!-- Required to query activities that can process text, see:
