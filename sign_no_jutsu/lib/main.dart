@@ -208,7 +208,7 @@ class _CameraScreenState extends State<CameraScreen> {
     final base64Image = base64Encode(bytes);
 
     final uri = Uri.parse(
-      'https://serverless.roboflow.com/asl-new/3?api_key=fYRVd9ZCSEXpM8aJqHMI&name=test.jpg',
+      'https://serverless.roboflow.com/rdsl/1?api_key=fYRVd9ZCSEXpM8aJqHMI&name=test.jpg',
     );
 
     final response = await http.post(
@@ -392,7 +392,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     final base64Image = base64Encode(bytes);
 
     final uri = Uri.parse(
-      'https://serverless.roboflow.com/asl-new/3?api_key=fYRVd9ZCSEXpM8aJqHMI&&name=test.jpg',
+      'https://serverless.roboflow.com/rdsl/1?api_key=fYRVd9ZCSEXpM8aJqHMI&&name=test.jpg',
     );
 
     final response = await http.post(
