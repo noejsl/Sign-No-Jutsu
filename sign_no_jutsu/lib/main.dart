@@ -6,7 +6,8 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
-
+import 'package:image_picker/image_picker.dart';
+import 'dart:async';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final cameras = await availableCameras();
@@ -63,9 +64,25 @@ class _SignLanguageMenuState extends State<SignLanguageMenu> {
       context,
       MaterialPageRoute(
         builder: (_) => CameraScreen(
+            camera: frontCamera,
+            language: language,
+            onResult: _addToHistory),
+      ),
+    );
+  }
+
+  void _openLivePrediction(BuildContext context, String language) {
+    final frontCamera = widget.cameras.firstWhere(
+      (camera) => camera.lensDirection == CameraLensDirection.front,
+      orElse: () => widget.cameras.first,
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LivePredictionScreen(
           camera: frontCamera,
           language: language,
-          onResult: _addToHistory),
+        ),
       ),
     );
   }
@@ -86,6 +103,14 @@ class _SignLanguageMenuState extends State<SignLanguageMenu> {
               onPressed: () {
                 Navigator.pop(context);
                 _openCamera(context, language);
+              },
+            ),
+            ElevatedButton.icon(
+              icon: Icon(Icons.videocam),
+              label: Text('Predicción en vivo'),
+              onPressed: () {
+                Navigator.pop(context);
+                _openLivePrediction(context, language);
               },
             ),
             ElevatedButton.icon(
@@ -135,6 +160,163 @@ class _SignLanguageMenuState extends State<SignLanguageMenu> {
           ),
         ),
       ]),
+    );
+  }
+}
+
+class LivePredictionScreen extends StatefulWidget {
+  final CameraDescription camera;
+  final String language;
+
+  const LivePredictionScreen({
+    Key? key,
+    required this.camera,
+    required this.language,
+  }) : super(key: key);
+
+  @override
+  _LivePredictionScreenState createState() => _LivePredictionScreenState();
+}
+
+class _LivePredictionScreenState extends State<LivePredictionScreen> {
+  late CameraController _controller;
+  late Future<void> _initializeControllerFuture;
+  bool _isProcessing = false;
+  String _currentPrediction = "Esperando predicción...";
+  double _currentConfidence = 0.0;
+  Timer? _predictionTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = CameraController(widget.camera, ResolutionPreset.medium);
+    _initializeControllerFuture = _controller.initialize().then((_) {
+      setState(() {});
+      _startPredictionLoop();
+    });
+  }
+
+  void _startPredictionLoop() {
+    _predictionTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
+      if (_isProcessing) return;
+      await _predictCurrentFrame();
+    });
+  }
+
+  Future<void> _predictCurrentFrame() async {
+    if (!_controller.value.isInitialized || _isProcessing) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final image = await _controller.takePicture();
+      final imageFile = File(image.path);
+      final result = await _sendToRoboflow(imageFile);
+
+      setState(() {
+        _currentPrediction = result['class'] ?? "Sin predicción";
+        _currentConfidence = result['confidence'] ?? 0.0;
+      });
+
+      // Eliminar la imagen temporal
+      await imageFile.delete();
+    } catch (e) {
+      print("Error en predicción: $e");
+      setState(() {
+        _currentPrediction = "Error";
+        _currentConfidence = 0.0;
+      });
+    } finally {
+      setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<Map<String, dynamic>> _sendToRoboflow(File imageFile) async {
+    final bytes = await imageFile.readAsBytes();
+    final base64Image = base64Encode(bytes);
+
+    final uri = Uri.parse(
+      'https://serverless.roboflow.com/rdsl/1?api_key=fYRVd9ZCSEXpM8aJqHMI&name=test.jpg',
+    );
+
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: base64Image,
+      encoding: Encoding.getByName('utf-8'),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['predictions'] != null && data['predictions'].isNotEmpty) {
+        return {
+          'class': data['predictions'][0]['class'],
+          'confidence': (data['predictions'][0]['confidence'] as num).toDouble()
+        };
+      }
+      return {'class': 'No prediction', 'confidence': 0.0};
+    }
+    return {'class': 'API Error', 'confidence': 0.0};
+  }
+
+  @override
+  void dispose() {
+    _predictionTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Predicción en vivo - ${widget.language}')),
+      body: Column(
+        children: [
+          Expanded(
+            child: FutureBuilder<void>(
+              future: _initializeControllerFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done) {
+                  return CameraPreview(_controller);
+                }
+                return Center(child: CircularProgressIndicator());
+              },
+            ),
+          ),
+          Container(
+            padding: EdgeInsets.all(20),
+            color: Colors.black.withOpacity(0.5),
+            child: Column(
+              children: [
+                Text(
+                  'Predicción actual:',
+                  style: TextStyle(color: Colors.white, fontSize: 18),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  _currentPrediction,
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Confianza: ${(_currentConfidence * 100).toStringAsFixed(2)}%',
+                  style: TextStyle(color: Colors.white, fontSize: 18),
+                ),
+                if (_isProcessing)
+                  Padding(
+                    padding: EdgeInsets.only(top: 10),
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -339,6 +521,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 }
+
 class GalleryScreen extends StatefulWidget {
   final String language;
   final Function(PredictionRecord) onResult;
@@ -378,9 +561,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
       confidence: result['confidence'],
     );
 
-    widget.onResult(record); // Uso correcto de widget.onResult
+    widget.onResult(record);
 
-    setState(() { // Uso correcto de setState
+    setState(() {
       _selectedImage = File(newImagePath);
       _predictedClass = result['class'];
       _confidence = result['confidence'];
@@ -413,13 +596,12 @@ class _GalleryScreenState extends State<GalleryScreen> {
       return {'class': 'No prediction', 'confidence': 0.0};
     }
     return {'class': 'API Error', 'confidence': 0.0};
-
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Galería - ${widget.language}')), // Uso correcto de widget.language
+      appBar: AppBar(title: Text('Galería - ${widget.language}')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
