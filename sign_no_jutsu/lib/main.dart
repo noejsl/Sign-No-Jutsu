@@ -6,8 +6,9 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
-import 'package:image_picker/image_picker.dart';
 import 'dart:async';
+import 'dart:math';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final cameras = await availableCameras();
@@ -23,23 +24,54 @@ class SignNoJutsuApp extends StatelessWidget {
     return MaterialApp(
       title: 'Sign No Jutsu',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.light(
+          primary: Color(0xFFFFB6C1),
+          secondary: Color(0xFFADD8E6),
+          surface: Color(0xFFFFF0F5),
+          background: Color(0xFFF5F5F5),
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: Color(0xFFFFB6C1),
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+          iconTheme: IconThemeData(color: Colors.white),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFFFFB6C1),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+        ),
+        cardTheme: CardTheme(
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          color: Colors.white,
+        ),
         useMaterial3: true,
       ),
-      home: SignLanguageMenu(cameras: cameras),
+      home: ASLMenu(cameras: cameras),
     );
   }
 }
 
-class SignLanguageMenu extends StatefulWidget {
+class ASLMenu extends StatefulWidget {
   final List<CameraDescription> cameras;
-  const SignLanguageMenu({Key? key, required this.cameras}) : super(key: key);
+  const ASLMenu({Key? key, required this.cameras}) : super(key: key);
 
   @override
-  State<SignLanguageMenu> createState() => _SignLanguageMenuState();
+  State<ASLMenu> createState() => _ASLMenuState();
 }
 
-class _SignLanguageMenuState extends State<SignLanguageMenu> {
+class _ASLMenuState extends State<ASLMenu> {
   final List<PredictionRecord> _history = [];
 
   void _addToHistory(PredictionRecord record) {
@@ -55,23 +87,7 @@ class _SignLanguageMenuState extends State<SignLanguageMenu> {
     });
   }
 
-  void _openCamera(BuildContext context, String language) {
-    final frontCamera = widget.cameras.firstWhere(
-      (camera) => camera.lensDirection == CameraLensDirection.front,
-      orElse: () => widget.cameras.first,
-    );
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CameraScreen(
-            camera: frontCamera,
-            language: language,
-            onResult: _addToHistory),
-      ),
-    );
-  }
-
-  void _openLivePrediction(BuildContext context, String language) {
+  void _openLivePrediction(BuildContext context) {
     final frontCamera = widget.cameras.firstWhere(
       (camera) => camera.lensDirection == CameraLensDirection.front,
       orElse: () => widget.cameras.first,
@@ -81,64 +97,94 @@ class _SignLanguageMenuState extends State<SignLanguageMenu> {
       MaterialPageRoute(
         builder: (_) => LivePredictionScreen(
           camera: frontCamera,
-          language: language,
         ),
       ),
     );
   }
 
-  void _showOptions(BuildContext context, String language) {
+  void _openGameMode(BuildContext context) {
+    final frontCamera = widget.cameras.firstWhere(
+      (camera) => camera.lensDirection == CameraLensDirection.front,
+      orElse: () => widget.cameras.first,
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GameModeScreen(
+          camera: frontCamera,
+        ),
+      ),
+    );
+  }
+
+  void _showOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(20),
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: Color(0xFFFFF0F5),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        padding: EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('¿Qué deseas hacer con $language?',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            ElevatedButton.icon(
-              icon: Icon(Icons.camera_alt),
-              label: Text('Usar cámara'),
+            Text(
+              'Opciones ASL',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFFF69B4),
+              ),
+            ),
+            SizedBox(height: 20),
+            _buildOptionButton(
+              icon: Icons.videocam,
+              label: 'Predicción en vivo',
               onPressed: () {
                 Navigator.pop(context);
-                _openCamera(context, language);
+                _openLivePrediction(context);
               },
             ),
-            ElevatedButton.icon(
-              icon: Icon(Icons.videocam),
-              label: Text('Predicción en vivo'),
-              onPressed: () {
-                Navigator.pop(context);
-                _openLivePrediction(context, language);
-              },
-            ),
-            ElevatedButton.icon(
-              icon: Icon(Icons.photo_library),
-              label: Text('Seleccionar desde galería'),
+            SizedBox(height: 12),
+            _buildOptionButton(
+              icon: Icons.photo_library,
+              label: 'Seleccionar desde galería',
               onPressed: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => GalleryScreen(
-                        language: language, onResult: _addToHistory),
+                    builder: (_) => GalleryScreen(onResult: _addToHistory),
                   ),
                 );
               },
             ),
-            ElevatedButton.icon(
-              icon: Icon(Icons.history),
-              label: Text('Ver historial'),
+            SizedBox(height: 12),
+            _buildOptionButton(
+              icon: Icons.history,
+              label: 'Ver historial',
               onPressed: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => HistoryScreen(
-                        history: _history, onDelete: _removeFromHistory),
+                      history: _history,
+                      onDelete: _removeFromHistory,
+                    ),
                   ),
                 );
+              },
+            ),
+            SizedBox(height: 12),
+            _buildOptionButton(
+              icon: Icons.games,
+              label: 'Modo Juego',
+              onPressed: () {
+                Navigator.pop(context);
+                _openGameMode(context);
               },
             ),
           ],
@@ -147,31 +193,76 @@ class _SignLanguageMenuState extends State<SignLanguageMenu> {
     );
   }
 
+  Widget _buildOptionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton.icon(
+      icon: Icon(icon, size: 28),
+      label: Text(label, style: TextStyle(fontSize: 18)),
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        minimumSize: Size(double.infinity, 60),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Selecciona un lenguaje de señas')),
-      body: ListView(padding: EdgeInsets.all(16), children: [
-        Card(
-          child: ListTile(
-            title: Text('Lengua de Señas Americana (ASL)'),
-            trailing: Icon(Icons.arrow_forward_ios),
-            onTap: () => _showOptions(context, 'ASL'),
-          ),
+      appBar: AppBar(title: Text('Sign No Jutsu - ASL')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/asl_logo.png',
+              width: 150,
+              height: 150,
+            ),
+            SizedBox(height: 30),
+            Text(
+              'Lengua de Señas Americana',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFFF69B4)),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Aprende y practica el alfabeto ASL',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600]),
+            ),
+            SizedBox(height: 40),
+            ElevatedButton(
+              onPressed: () => _showOptions(context),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                child: Text(
+                  'Comenzar',
+                  style: TextStyle(fontSize: 20),
+                ),
+              ),
+            ),
+          ],
         ),
-      ]),
+      ),
     );
   }
 }
 
 class LivePredictionScreen extends StatefulWidget {
   final CameraDescription camera;
-  final String language;
 
   const LivePredictionScreen({
     Key? key,
     required this.camera,
-    required this.language,
   }) : super(key: key);
 
   @override
@@ -189,15 +280,19 @@ class _LivePredictionScreenState extends State<LivePredictionScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = CameraController(widget.camera, ResolutionPreset.medium);
+    _controller = CameraController(
+      widget.camera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+    );
     _initializeControllerFuture = _controller.initialize().then((_) {
-      setState(() {});
       _startPredictionLoop();
     });
   }
 
   void _startPredictionLoop() {
-    _predictionTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
+    _predictionTimer = Timer.periodic(Duration(milliseconds: 1500), (timer) async {
       if (_isProcessing) return;
       await _predictCurrentFrame();
     });
@@ -206,6 +301,206 @@ class _LivePredictionScreenState extends State<LivePredictionScreen> {
   Future<void> _predictCurrentFrame() async {
     if (!_controller.value.isInitialized || _isProcessing) return;
 
+    if (!_isProcessing) {
+      setState(() => _isProcessing = true);
+    }
+
+    try {
+      final image = await _controller.takePicture();
+      final imageFile = File(image.path);
+      final result = await _sendToRoboflow(imageFile);
+
+      _currentPrediction = result['class'] ?? "Sin predicción";
+      _currentConfidence = result['confidence'] ?? 0.0;
+      
+      setState(() {});
+
+      await imageFile.delete();
+    } catch (e) {
+      print("Error en predicción: $e");
+      _currentPrediction = "Error";
+      _currentConfidence = 0.0;
+      setState(() {});
+    } finally {
+      if (_isProcessing) {
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>> _sendToRoboflow(File imageFile) async {
+    final bytes = await imageFile.readAsBytes();
+    final base64Image = base64Encode(bytes);
+
+    final uri = Uri.parse(
+      'https://serverless.roboflow.com/rdsl/1?api_key=fYRVd9ZCSEXpM8aJqHMI&name=test.jpg',
+    );
+
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: base64Image,
+      encoding: Encoding.getByName('utf-8'),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['predictions'] != null && data['predictions'].isNotEmpty) {
+        return {
+          'class': data['predictions'][0]['class'],
+          'confidence': (data['predictions'][0]['confidence'] as num).toDouble()
+        };
+      }
+      return {'class': 'No prediction', 'confidence': 0.0};
+    }
+    return {'class': 'API Error', 'confidence': 0.0};
+  }
+
+  @override
+  void dispose() {
+    _predictionTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Predicción en vivo - ASL')),
+      body: Column(
+        children: [
+          Expanded(
+            child: FutureBuilder<void>(
+              future: _initializeControllerFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done) {
+                  return CameraPreview(_controller);
+                }
+                return Center(child: CircularProgressIndicator());
+              },
+            ),
+          ),
+          _buildResultsContainer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultsContainer() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Color(0xFFFFF0F5),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Predicción actual:',
+            style: TextStyle(
+              color: Color(0xFFFF69B4),
+              fontSize: 20,
+              fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+          SizedBox(
+            height: 40,
+            child: Center(
+              child: Text(
+                _currentPrediction,
+                style: TextStyle(
+                  color: Colors.pinkAccent,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          SizedBox(height: 10),
+          Text(
+            'Confianza: ${(_currentConfidence * 100).toStringAsFixed(2)}%',
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 18),
+          ),
+          if (_isProcessing)
+            Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.pinkAccent),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class GameModeScreen extends StatefulWidget {
+  final CameraDescription camera;
+
+  const GameModeScreen({
+    Key? key,
+    required this.camera,
+  }) : super(key: key);
+
+  @override
+  _GameModeScreenState createState() => _GameModeScreenState();
+}
+
+class _GameModeScreenState extends State<GameModeScreen> {
+  late CameraController _controller;
+  late Future<void> _initializeControllerFuture;
+  bool _isProcessing = false;
+  String _currentPrediction = "";
+  double _currentConfidence = 0.0;
+  Timer? _predictionTimer;
+  String _targetLetter = "";
+  bool _isCorrect = false;
+  bool _showResult = false;
+
+  final List<String> _alphabet = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 
+    'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 
+    'T', 'U', 'V', 'W', 'X', 'Y'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = CameraController(
+      widget.camera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+    );
+    _initializeControllerFuture = _controller.initialize().then((_) {
+      _startNewRound();
+    });
+  }
+
+  void _startNewRound() {
+    setState(() {
+      _targetLetter = _alphabet[Random().nextInt(_alphabet.length)];
+      _isCorrect = false;
+      _showResult = false;
+      _currentPrediction = "";
+      _currentConfidence = 0.0;
+    });
+    _startPredictionLoop();
+  }
+
+  void _startPredictionLoop() {
+    _predictionTimer?.cancel();
+    _predictionTimer = Timer.periodic(Duration(milliseconds: 1500), (timer) async {
+      if (_isProcessing || _isCorrect) return;
+      await _predictCurrentFrame();
+    });
+  }
+
+  Future<void> _predictCurrentFrame() async {
+    if (!_controller.value.isInitialized || _isProcessing || _isCorrect) return;
+
     setState(() => _isProcessing = true);
 
     try {
@@ -213,19 +508,27 @@ class _LivePredictionScreenState extends State<LivePredictionScreen> {
       final imageFile = File(image.path);
       final result = await _sendToRoboflow(imageFile);
 
-      setState(() {
-        _currentPrediction = result['class'] ?? "Sin predicción";
-        _currentConfidence = result['confidence'] ?? 0.0;
-      });
+      final prediction = result['class'] ?? "";
+      final confidence = result['confidence'] ?? 0.0;
 
-      // Eliminar la imagen temporal
+      if (prediction == _targetLetter && confidence > 0.7) {
+        _predictionTimer?.cancel();
+        setState(() {
+          _isCorrect = true;
+          _showResult = true;
+          _currentPrediction = prediction;
+          _currentConfidence = confidence;
+        });
+      } else {
+        setState(() {
+          _currentPrediction = prediction;
+          _currentConfidence = confidence;
+        });
+      }
+
       await imageFile.delete();
     } catch (e) {
       print("Error en predicción: $e");
-      setState(() {
-        _currentPrediction = "Error";
-        _currentConfidence = 0.0;
-      });
     } finally {
       setState(() => _isProcessing = false);
     }
@@ -269,7 +572,7 @@ class _LivePredictionScreenState extends State<LivePredictionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Predicción en vivo - ${widget.language}')),
+      appBar: AppBar(title: Text('Modo Juego - ASL')),
       body: Column(
         children: [
           Expanded(
@@ -277,185 +580,112 @@ class _LivePredictionScreenState extends State<LivePredictionScreen> {
               future: _initializeControllerFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.done) {
-                  return CameraPreview(_controller);
+                  return Stack(
+                    children: [
+                      CameraPreview(_controller),
+                      if (_showResult)
+                        Container(
+                          color: Colors.black54,
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '¡Correcto!',
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontSize: 40,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: 20),
+                                Text(
+                                  'Letra: $_targetLetter',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 30,
+                                  ),
+                                ),
+                                SizedBox(height: 40),
+                                ElevatedButton(
+                                  onPressed: _startNewRound,
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                    child: Text(
+                                      'Siguiente Letra',
+                                      style: TextStyle(fontSize: 20),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
                 }
                 return Center(child: CircularProgressIndicator());
               },
             ),
           ),
-          Container(
-            padding: EdgeInsets.all(20),
-            color: Colors.black.withOpacity(0.5),
-            child: Column(
-              children: [
-                Text(
-                  'Predicción actual:',
-                  style: TextStyle(color: Colors.white, fontSize: 18),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  _currentPrediction,
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  'Confianza: ${(_currentConfidence * 100).toStringAsFixed(2)}%',
-                  style: TextStyle(color: Colors.white, fontSize: 18),
-                ),
-                if (_isProcessing)
-                  Padding(
-                    padding: EdgeInsets.only(top: 10),
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  ),
-              ],
+          _buildGameControls(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGameControls() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Color(0xFFFFF0F5),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Haz la letra:',
+            style: TextStyle(
+              color: Color(0xFFFF69B4),
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class CameraScreen extends StatefulWidget {
-  final CameraDescription camera;
-  final String language;
-  final Function(PredictionRecord) onResult;
-
-  const CameraScreen(
-      {Key? key,
-      required this.camera,
-      required this.language,
-      required this.onResult})
-      : super(key: key);
-
-  @override
-  _CameraScreenState createState() => _CameraScreenState();
-}
-
-class _CameraScreenState extends State<CameraScreen> {
-  late CameraController _controller;
-  late Future<void> _initializeControllerFuture;
-  bool _isProcessing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = CameraController(widget.camera, ResolutionPreset.medium);
-    _initializeControllerFuture = _controller.initialize();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _takePictureAndPredict() async {
-    if (_isProcessing) return;
-    setState(() => _isProcessing = true);
-
-    try {
-      await _initializeControllerFuture;
-      final XFile file = await _controller.takePicture();
-      final result = await _sendToRoboflow(File(file.path));
-      
-      final directory = await getApplicationDocumentsDirectory();
-      final newImagePath = path.join(
-          directory.path, 'camera_${DateTime.now().millisecondsSinceEpoch}.jpg');
-      await File(file.path).copy(newImagePath);
-
-      final record = PredictionRecord(
-        imagePath: newImagePath,
-        prediction: result['class'],
-        confidence: result['confidence'],
-      );
-
-      widget.onResult(record);
-      
-      _showPrediction(result);
-    } catch (e) {
-      _showPrediction({'class': 'Error', 'confidence': 0.0, 'message': e.toString()});
-    } finally {
-      setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<Map<String, dynamic>> _sendToRoboflow(File imageFile) async {
-    final bytes = await imageFile.readAsBytes();
-    final base64Image = base64Encode(bytes);
-
-    final uri = Uri.parse(
-      'https://serverless.roboflow.com/rdsl/1?api_key=fYRVd9ZCSEXpM8aJqHMI&name=test.jpg',
-    );
-
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: base64Image,
-      encoding: Encoding.getByName('utf-8'),
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['predictions'] != null && data['predictions'].isNotEmpty) {
-        return {
-          'class': data['predictions'][0]['class'],
-          'confidence': (data['predictions'][0]['confidence'] as num).toDouble()
-        };
-      }
-      return {'class': 'No prediction', 'confidence': 0.0};
-    }
-    return {'class': 'API Error', 'confidence': 0.0};
-  }
-
-  void _showPrediction(Map<String, dynamic> result) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Predicción'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Letra: ${result['class']}'),
-            Text('Confianza: ${(result['confidence'] * 100).toStringAsFixed(2)}%'),
-            if (result['message'] != null) Text(result['message']),
+          SizedBox(height: 10),
+          Text(
+            _targetLetter,
+            style: TextStyle(
+              color: Colors.pinkAccent,
+              fontSize: 60,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 20),
+          if (!_showResult) ...[
+            Text(
+              'Predicción: $_currentPrediction',
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 20,
+              ),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Confianza: ${(_currentConfidence * 100).toStringAsFixed(2)}%',
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 18,
+              ),
+            ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('OK'),
-          )
+          if (_isProcessing)
+            Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.pinkAccent),
+              ),
+            ),
         ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Cámara - ${widget.language}')),
-      body: FutureBuilder<void>(
-        future: _initializeControllerFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            return Stack(children: [
-              CameraPreview(_controller),
-              if (_isProcessing) Center(child: CircularProgressIndicator()),
-            ]);
-          }
-          return Center(child: CircularProgressIndicator());
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _takePictureAndPredict,
-        child: Icon(Icons.camera),
       ),
     );
   }
@@ -491,44 +721,72 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Historial')),
-      body: ListView.builder(
-        itemCount: widget.history.length,
-        itemBuilder: (context, index) {
-          final record = widget.history[index];
-          return Card(
-            margin: const EdgeInsets.all(8),
-            child: ListTile(
-              leading: Image.file(
-                File(record.imagePath),
-                width: 60,
-                height: 60,
-                fit: BoxFit.cover,
+      appBar: AppBar(title: Text('Historial ASL')),
+      body: widget.history.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.history, size: 50, color: Colors.grey),
+                  SizedBox(height: 20),
+                  Text(
+                    'Aún no hay predicciones',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                ],
               ),
-              title: Text('Letra: ${record.prediction}'),
-              subtitle: Text('Confianza: ${(record.confidence * 100).toStringAsFixed(2)}%'),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () {
-                  widget.onDelete(record.imagePath);
-                  setState(() {});
-                },
-              ),
+            )
+          : ListView.builder(
+              padding: EdgeInsets.all(12),
+              itemCount: widget.history.length,
+              itemBuilder: (context, index) {
+                final record = widget.history[index];
+                return Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Card(
+                    child: ListTile(
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(record.imagePath),
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      title: Text(
+                        'Letra: ${record.prediction}',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        'Confianza: ${(record.confidence * 100).toStringAsFixed(2)}%',
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(Icons.delete, color: Colors.pinkAccent),
+                        onPressed: () {
+                          widget.onDelete(record.imagePath);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Predicción eliminada'),
+                              backgroundColor: Colors.pinkAccent,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }
 
 class GalleryScreen extends StatefulWidget {
-  final String language;
   final Function(PredictionRecord) onResult;
 
   const GalleryScreen({
     Key? key, 
-    required this.language, 
     required this.onResult
   }) : super(key: key);
 
@@ -540,34 +798,53 @@ class _GalleryScreenState extends State<GalleryScreen> {
   File? _selectedImage;
   String? _predictedClass;
   double? _confidence;
+  bool _isProcessing = false;
 
   Future<void> _pickAndPredict() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (picked == null) return;
+    if (_isProcessing) return;
+    
+    setState(() => _isProcessing = true);
+    
+    try {
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (picked == null) {
+        setState(() => _isProcessing = false);
+        return;
+      }
 
-    final imageFile = File(picked.path);
-    final result = await _sendToRoboflow(imageFile);
+      final imageFile = File(picked.path);
+      final result = await _sendToRoboflow(imageFile);
 
-    final directory = await getApplicationDocumentsDirectory();
-    final newImagePath = path.join(
-      directory.path, 
-      'gallery_${DateTime.now().millisecondsSinceEpoch}.jpg'
-    );
-    await imageFile.copy(newImagePath);
+      final directory = await getApplicationDocumentsDirectory();
+      final newImagePath = path.join(
+        directory.path, 
+        'gallery_${DateTime.now().millisecondsSinceEpoch}.jpg'
+      );
+      await imageFile.copy(newImagePath);
 
-    final record = PredictionRecord(
-      imagePath: newImagePath,
-      prediction: result['class'],
-      confidence: result['confidence'],
-    );
+      final record = PredictionRecord(
+        imagePath: newImagePath,
+        prediction: result['class'],
+        confidence: result['confidence'],
+      );
 
-    widget.onResult(record);
+      widget.onResult(record);
 
-    setState(() {
-      _selectedImage = File(newImagePath);
-      _predictedClass = result['class'];
-      _confidence = result['confidence'];
-    });
+      setState(() {
+        _selectedImage = File(newImagePath);
+        _predictedClass = result['class'];
+        _confidence = result['confidence'];
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isProcessing = false);
+    }
   }
 
   Future<Map<String, dynamic>> _sendToRoboflow(File imageFile) async {
@@ -601,23 +878,93 @@ class _GalleryScreenState extends State<GalleryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Galería - ${widget.language}')),
+      appBar: AppBar(title: Text('Galería ASL')),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_selectedImage != null) ...[
-              Image.file(_selectedImage!, height: 200),
-              const SizedBox(height: 20),
-              Text('Predicción: $_predictedClass'),
-              Text('Confianza: ${(_confidence! * 100).toStringAsFixed(2)}%'),
-              const SizedBox(height: 20),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_selectedImage != null) ...[
+                Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: Image.file(
+                      _selectedImage!,
+                      height: 250,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 20),
+                Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Resultado:',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.pinkAccent),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          _predictedClass ?? '',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.deepPurple),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'Confianza: ${(_confidence ?? 0 * 100).toStringAsFixed(2)}%',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: 20),
+              ] else ...[
+                Icon(
+                  Icons.photo_library,
+                  size: 100,
+                  color: Color(0xFFFFB6C1)),
+                SizedBox(height: 20),
+                Text(
+                  'Selecciona una imagen para analizar',
+                  style: TextStyle(fontSize: 18),
+                ),
+                SizedBox(height: 30),
+              ],
+              ElevatedButton.icon(
+                icon: _isProcessing
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(Colors.white),
+                        ),
+                      )
+                    : Icon(Icons.image),
+                label: Text(
+                  _isProcessing ? 'Procesando...' : 'Seleccionar imagen',
+                  style: TextStyle(fontSize: 18),
+                ),
+                onPressed: _isProcessing ? null : _pickAndPredict,
+                style: ElevatedButton.styleFrom(
+                  minimumSize: Size(200, 50),
+                ),
+              ),
             ],
-            ElevatedButton(
-              onPressed: _pickAndPredict,
-              child: const Text('Seleccionar imagen de la galería'),
-            ),
-          ],
+          ),
         ),
       ),
     );
