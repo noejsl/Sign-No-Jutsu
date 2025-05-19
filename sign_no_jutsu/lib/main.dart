@@ -480,6 +480,8 @@ class _GameModeScreenState extends State<GameModeScreen> {
   }
 
   void _startNewRound() {
+    _predictionTimer?.cancel();
+    
     setState(() {
       _targetLetter = _alphabet[Random().nextInt(_alphabet.length)];
       _isCorrect = false;
@@ -487,11 +489,11 @@ class _GameModeScreenState extends State<GameModeScreen> {
       _currentPrediction = "";
       _currentConfidence = 0.0;
     });
+    
     _startPredictionLoop();
   }
 
   void _startPredictionLoop() {
-    _predictionTimer?.cancel();
     _predictionTimer = Timer.periodic(Duration(milliseconds: 1500), (timer) async {
       if (_isProcessing || _isCorrect) return;
       await _predictCurrentFrame();
@@ -508,10 +510,10 @@ class _GameModeScreenState extends State<GameModeScreen> {
       final imageFile = File(image.path);
       final result = await _sendToRoboflow(imageFile);
 
-      final prediction = result['class'] ?? "";
+      final prediction = result['class']?.toUpperCase() ?? "";
       final confidence = result['confidence'] ?? 0.0;
 
-      if (prediction == _targetLetter && confidence > 0.7) {
+      if (prediction == _targetLetter.toUpperCase() && confidence > 0.5) {
         _predictionTimer?.cancel();
         setState(() {
           _isCorrect = true;
@@ -583,7 +585,7 @@ class _GameModeScreenState extends State<GameModeScreen> {
                   return Stack(
                     children: [
                       CameraPreview(_controller),
-                      if (_showResult)
+                      if (_isCorrect)
                         Container(
                           color: Colors.black54,
                           child: Center(
@@ -661,7 +663,7 @@ class _GameModeScreenState extends State<GameModeScreen> {
             ),
           ),
           SizedBox(height: 20),
-          if (!_showResult) ...[
+          if (!_isCorrect) ...[
             Text(
               'Predicción: $_currentPrediction',
               style: TextStyle(
